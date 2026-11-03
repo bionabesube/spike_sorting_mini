@@ -68,3 +68,21 @@ También puedes ejecutar `python main.py` para realizar la inspección y la vali
 ## Resultados
 Los resultados se guardan bajo `results/`, en una carpeta asociada a la grabación. Según la versión de Kilosort, pueden incluir tiempos de spikes, asignaciones de clusters, plantillas, métricas y gráficas.
 Los scripts adicionales en `src/` sirven para generar resúmenes y apoyar la evaluación de los clusters. Las métricas son herramientas de orientación, no una confirmación automática de que una unidad sea válida.
+
+
+## Referencias
+
+### Spike sorting
+- [Kilosort 4 - Official Documentation](https://kilosort.readthedocs.io/en/latest/)
+- Pachitariu, M., Sridhar, S., Pennington, J., & Stringer, C. (2024). [Spike sorting with Kilosort4](https://doi.org/10.1038/s41592-024-02232-7). Nature Methods, 21, 914–921.
+
+### Data acquisition and probe geometry
+- [SpikeGLX - User Manual](https://billkarsh.github.io/SpikeGLX/Sgl_help/UserManual.html)
+- [Neuropixels 2.0 - IMEC](https://www.neuropixels.org/probe2-0)
+- Steinmetz, N. A., et al. (2021). [Neuropixels 2.0: A miniaturized high-density probe for stable, long-term brain recordings](https://doi.org/10.1126/science.abf4588). Science, 372(6539).
+
+### Spike sorting quality control
+- [Phy - Documentation](https://phy.readthedocs.io/en/latest/)
+- [SpikeInterface - Quality Metrics](https://spikeinterface.readthedocs.io/en/stable/modules/metrics/quality_metrics.html)
+- Fabre, J. M. J., et al. (2023). [Bombcell: Automated curation and cell classification of spike-sorted electrophysiology data](https://doi.org/10.5281/zenodo.8172821).
+
