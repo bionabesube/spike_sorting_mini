@@ -1,0 +1,11 @@
+{
+  "data_file": "Z:\\Cavelli\\NP\\AOG15\\prueba_g0\\prueba_g0_imec0\\prueba_g0_t0.imec0.ap.bin",
+  "probe_file": "config\\probe_np2.json",
+  "results_root": "results",
+  "test_duration_seconds": 60,
+  "start_time_seconds": 0,
+  "torch_threads": 4,
+  "do_CAR": true,
+  "invert_sign": false,
+  "save_extra_vars": false
+}
