@@ -1,29 +1,10 @@
-# Mini spike sorting: de SpikeGLX a Kilosort 4
+# AOG15 — SpikeGLX → Kilosort 4 (CPU)
 
-Explorar las etapas básicas del *spike sorting*: inspeccionar una grabación, definir la geometría de la sonda, ejecutar Kilosort y revisar los resultados.
+Pipeline mínimo para ejecutar Kilosort 4 desde VS Code en Windows, leyendo `imec0.ap.bin` desde la unidad de red `Z:` y guardando resultados en el disco local.
 
-La idea es aprender qué hace cada paso de un pipeline, no ofrecer una herramienta lista para analizar cualquier grabación.
+**No usa SpikeInterface. No convierte ni copia el binario.** Kilosort lee el `.bin` por bloques. La lectura desde red puede ser lenta; no desconectes la unidad Z: durante el proceso.
 
-## ¿Qué hace?
-A partir de una grabación de voltaje neuronal en formato binario de SpikeGLX (`.ap.bin`) y sus metadatos (`.ap.meta`), el proyecto:
-
-1. Inspecciona la grabación y comprueba información básica, como el número de canales y la frecuencia de muestreo.
-2. Prepara el mapa de contactos de la sonda a partir de las coordenadas y los canales indicados.
-3. Ejecuta Kilosort 4 sobre un segmento de la grabación o sobre la sesión completa.
-4. Guarda los resultados para resumirlos y revisarlos posteriormente.
-
-Kilosort detecta eventos neuronales (*spikes*) y los agrupa en *clusters*. Un cluster puede corresponder a una neurona, pero el resultado requiere revisión y control de calidad.
-
-## Requisitos
-- Windows y PowerShell.
-- Python 3.11 recomendado.
-- Una grabación de SpikeGLX (`.ap.bin`) y su archivo `.ap.meta`.
-- El mapa de canales y la geometría correctos para la sonda y la sesión.
-
-El proyecto está configurado para ejecutar Kilosort en CPU. El procesamiento de grabaciones largas puede tomar bastante tiempo.
-
-## Instalación
-Desde la carpeta del proyecto:
+## 1. Entorno (PowerShell terminal de VS Code)
 
 ```powershell
 conda create -n kilosort4 python=3.11 -y
@@ -32,48 +13,70 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-## Configuración
-Edita `config/settings.json` y ajusta `data_file` para que apunte al archivo `.ap.bin` de tu sesión. Por ejemplo:
+Verificá CPU:
 
-```json
-{
-  "data_file": "D:\\datos\\mi_sesion\\grabacion.imec0.ap.bin",
-  "probe_file": "config\\probe_np2.json",
-  "results_root": "results",
-  "test_duration_seconds": 20,
-  "start_time_seconds": 0,
-  "torch_threads": 4,
-  "do_CAR": true,
-  "invert_sign": false,
-  "save_extra_vars": false
-}
+```powershell
+python -c "import torch; print('torch', torch.__version__); print('CUDA disponible:', torch.cuda.is_available())"
 ```
 
-El archivo `.meta` correspondiente debe estar junto al `.bin`. No publiques rutas locales que revelen información privada.
+Debe indicar `CUDA disponible: False` en tu ThinkPad. Se ejecutará en CPU.
 
-Antes de generar el mapa de la sonda, completa `config/probe_contacts.csv` con los contactos neuronales realmente grabados:
+## 2. Configurar la grabación
 
-- `binary_channel`: índice del canal en el binario, empezando en 0.
-- `x_um` y `y_um`: coordenadas físicas del contacto en micrómetros.
-- `shank`: identificador del shank.
+Editá `config/settings.json`. La ruta de ejemplo apunta a la grabación de prueba que aparece en el listado que compartiste:
 
-Usa el mapa correspondiente a la sonda y a la configuración de adquisición. No inventes coordenadas ni asumas que todos los canales guardados son canales neuronales.
+`Z:\AOG15\prueba_g0\prueba_g0_imec0\prueba_g0_t0.imec0.ap.bin`
 
-## Flujo de trabajo
+El `.meta` se busca automáticamente cambiando `.bin` por `.meta`.
 
-Ejecuta los pasos desde la carpeta del proyecto:
+## 3. Inspeccionar primero (no ejecuta Kilosort)
+
 ```powershell
 python src/01_inspect_spikeglx.py
+```
+
+El script muestra `nSavedChans`, `imSampRate`, tamaño, duración estimada y comprueba que el tamaño del `.bin` sea múltiplo de `nSavedChans * 2` bytes (int16). Si el binario está incompleto o los metadatos no coinciden, no sigas al sorting.
+
+## 4. Preparar el mapa de la sonda
+
+Kilosort necesita un mapa real de los contactos usados en esa grabación. No se debe asumir que todos los canales guardados son canales neuronales ni inventar el mapa de Neuropixels 2.0.
+
+Completá `config/probe_contacts.csv` con una fila por contacto AP neuronal que realmente se grabó:
+
+- `binary_channel`: índice de canal en el `.ap.bin`, empezando en **0**. No incluyas el canal SY si existe.
+- `x_um`, `y_um`: coordenadas físicas de cada contacto en micrómetros, según el modelo/cableado real.
+- `shank`: identificador numérico del shank.
+
+Usá el mapa de canales correspondiente a la sonda y a la configuración de adquisición de esa sesión (por ejemplo, documentación del laboratorio / SpikeGLX / mapa de sonda). No copies un mapa NP1 ni asumas orden de canales.
+
+Luego:
+
+```powershell
 python src/02_make_probe.py
+```
+
+Se genera `config/probe_np2.json`. El script valida índices únicos, dimensiones y canales dentro del binario. **No genera coordenadas ficticias.**
+
+## 5. Validar y ejecutar un segmento corto
+
+En `config/settings.json` dejá `test_duration_seconds` en 20 para la primera prueba. Después:
+
+```powershell
 python src/03_validate.py
 python src/04_run_kilosort.py
 ```
 
-Para la primera prueba, configura un segmento corto con `test_duration_seconds`. Cuando hayas comprobado que funciona, puedes usar `null` para procesar toda la grabación. El tiempo necesario dependerá de la duración, el número de canales y el equipo.
+El script llama a `kilosort.run_kilosort` con `device=torch.device('cpu')`, `data_dtype='int16'`, `n_chan_bin` y `fs` leídos del `.meta`, y `tmin/tmax` para limitar el segmento. Resultados en `results/<nombre_grabacion>/`.
 
-También puedes ejecutar `python main.py` para realizar la inspección y la validación iniciales. **Ese comando no ejecuta Kilosort**; el sorting se lanza por separado con `python src/04_run_kilosort.py`.
+Para procesar toda la sesión, cambiá `test_duration_seconds` a `null` (sin comillas) y volvé a ejecutar. **No hagas esto en el T590 sin antes comprobar que el segmento de prueba terminó y que el tiempo/espacio son razonables.** El sorting por CPU de una sesión larga puede tardar muchísimo.
 
-## Resultados
-Los resultados se guardan bajo `results/`, en una carpeta asociada a la grabación. Según la versión de Kilosort, pueden incluir tiempos de spikes, asignaciones de clusters, plantillas, métricas y gráficas.
+## 6. Qué produce Kilosort
 
-Los scripts adicionales en `src/` sirven para generar resúmenes y apoyar la evaluación de los clusters. Las métricas son herramientas de orientación, no una confirmación automática de que una unidad sea válida.
+Kilosort guarda sus resultados y archivos compatibles con Phy en la carpeta de resultados (por ejemplo `spike_times.npy`, `spike_clusters.npy`, `templates.npy`, `cluster_*.tsv`, `params.py`, etc.; los nombres exactos dependen de la versión). Kilosort realiza internamente filtrado/preprocesamiento, detección, corrección de drift y clustering. No filtres previamente el `.bin` para este flujo.
+
+## Notas sobre el servidor
+
+- El `.bin` se lee desde `Z:`; los resultados van a `results/` en el proyecto local.
+- No abras ni modifiques el binario mientras corre Kilosort.
+- Si la conexión de red es inestable o la lectura muy lenta, la alternativa es copiar **solo la grabación de prueba** a un SSD con espacio suficiente; no hace falta duplicar todas las sesiones.
+- Este proyecto es un punto de partida de spike sorting, no una reproducción exacta del pipeline IBL ni un reemplazo del control de calidad manual en Phy.

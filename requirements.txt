@@ -1,0 +1,4 @@
+kilosort>=4,<5
+numpy
+pandas
+matplotlib
